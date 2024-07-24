@@ -1,0 +1,16 @@
+jtype: Flow
+version: '1'
+with:
+  port: 51000
+  protocol: http
+  prefetch: 10
+executors:
+  - name: clip_t
+    uses:
+      jtype: CLIPEncoder
+      with:
+        device: cuda
+        name: "ViT-H-14::laion2b-s32b-b79k"
+      metas:
+        py_modules:
+          - clip_server.executors.clip_torch
