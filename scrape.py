@@ -88,9 +88,6 @@ class BGSListener(StreamListener):
             }
         }
 
-        # JSON object
-        #print(json.dumps(object))
-
         queue_buffer.append(object)
         print('\r- Buffered %d/%d posts - ID: %s' % (len(queue_buffer), buffer_size, object["id"]),
               end='', flush=True)

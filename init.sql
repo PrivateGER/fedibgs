@@ -13,8 +13,8 @@ CREATE TABLE posts (
        post_url TEXT NOT NULL,
        tags JSONB NOT NULL,
        author_id INT NOT NULL,
-       text_embedding vector(1024),
        indexed_at TIMESTAMPTZ DEFAULT NOW(),
+       content_ts tsvector GENERATED ALWAYS AS (to_tsvector('english', content)) STORED,
        FOREIGN KEY (author_id) REFERENCES authors(id)
 );
 
@@ -22,15 +22,14 @@ CREATE TABLE attachments (
      id SERIAL PRIMARY KEY,
      post_id UUID NOT NULL,
      description TEXT,
+     description_ts tsvector GENERATED ALWAYS AS (to_tsvector('english', description)) STORED,
      url TEXT NOT NULL,
-     vector vector(1024),
      indexed_at TIMESTAMPTZ DEFAULT NOW(),
-     FOREIGN KEY (post_id) REFERENCES posts(id)
+     FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE
 );
 
-CREATE INDEX posts_text_embedding_idx ON posts USING vectors(text_embedding vector_cos_ops);
-CREATE INDEX attachments_vector_idx ON attachments USING vectors(vector vector_cos_ops);
-
 CREATE INDEX posts_author_id_idx ON posts(author_id);
-CREATE INDEX posts_tags_idx ON posts USING GIN(tags);
-CREATE INDEX posts_text_idx ON posts USING GIN(to_tsvector('english', content));
+CREATE INDEX post_created_at_idx ON posts(indexed_at);
+CREATE INDEX posts_tags_idx ON posts USING GIN(description_ts);
+CREATE INDEX posts_text_idx ON posts USING GIN(content_ts);
+
