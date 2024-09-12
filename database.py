@@ -5,7 +5,6 @@ import psycopg
 import psycopg_pool
 
 from redis import Redis
-from clip_client import Client
 
 __db_pool = psycopg_pool.ConnectionPool(
     conninfo="dbname=fedibgs user=postgres password=postgres host=10.10.10.12 port=5432",

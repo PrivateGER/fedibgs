@@ -5,7 +5,6 @@ from contextlib import closing
 
 import requests
 from mastodon import StreamListener
-from rq import Queue
 
 import database
 import tasks
@@ -93,7 +92,6 @@ class BGSListener(StreamListener):
               end='', flush=True)
 
         if len(queue_buffer) >= buffer_size:
-            #q.enqueue(ingest.ingest_batch, queue_buffer, result_ttl=60, job_timeout=60 * 60 * 30)
             tasks.ingest_batch.delay(queue_buffer)
 
             queue_buffer.clear()

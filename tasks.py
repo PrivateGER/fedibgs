@@ -2,10 +2,8 @@ import json
 import time
 import uuid
 
-from clip_client import Client
 from io import StringIO
 from html.parser import HTMLParser
-from docarray import DocumentArray, Document
 from psycopg import ProgrammingError
 from celery import signals
 import database
@@ -60,17 +58,7 @@ def preprocess_dataset(dataset):
     }
     return preprocessed
 
-
-c = Client('http://localhost:51000')
-
-
-class ElementDocument(Document):
-    text: str = None
-    uri: str = None
-
-
 author_id_map = {}
-
 
 @signals.task_retry.connect
 @signals.task_failure.connect
@@ -146,5 +134,10 @@ def ingest_batch(datasets):
             except:
                 connection.rollback()
                 raise Exception("Failed to insert post and attachments")
-
     return True
+
+
+@app.task(autoretry_for=(Exception,))
+def sync_posts_not_in_meilisearch():
+    return
+

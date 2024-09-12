@@ -30,6 +30,9 @@ CREATE TABLE attachments (
 
 CREATE INDEX posts_author_id_idx ON posts(author_id);
 CREATE INDEX post_created_at_idx ON posts(indexed_at);
+CREATE INDEX post_id_idx ON posts(post);
 CREATE INDEX posts_tags_idx ON posts USING GIN(description_ts);
 CREATE INDEX posts_text_idx ON posts USING GIN(content_ts);
+
+ALTER TABLE posts ADD COLUMN IF NOT EXISTS meilisearch_indexed BOOLEAN DEFAULT FALSE;
 
