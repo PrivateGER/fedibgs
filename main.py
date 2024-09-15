@@ -145,4 +145,4 @@ class SPAStaticFiles(StaticFiles):
 
 
 
-app.mount('/', SPAStaticFiles(directory='static', html=True))
+app.mount('/', SPAStaticFiles(directory='fedibgs-fe/dist/', html=True))

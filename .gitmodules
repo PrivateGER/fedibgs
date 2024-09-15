@@ -1,0 +1,3 @@
+[submodule "fedibgs-fe"]
+	path = fedibgs-fe
+	url = https://github.com/PrivateGER/fedibgs-fe.git
