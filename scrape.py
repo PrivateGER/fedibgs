@@ -23,7 +23,7 @@ if len(sys.argv) >= 3 and sys.argv[2]:
 q = Queue(connection=database.get_redis_connection())
 
 queue_buffer = []
-buffer_size = 64
+buffer_size = 32
 class BGSListener(StreamListener):
     def on_update(self, status):
         # Verify that the id is set, that content is not empty, and that the content is not a boost
