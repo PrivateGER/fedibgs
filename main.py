@@ -47,18 +47,81 @@ async def counts():
 
     return {"posts": cachedStats["posts"], "attachments": cachedStats["attachments"]}
 
+@app.get("/api/author/search")
+async def search_authors(q: str):
+    q = q.strip()
+    q = q.replace("%", "") # lmao
+    # Add wildcards to query
+    q = f"%{q}%"
+
+    with database.get_db_connection() as connection:
+        cursor = connection.cursor()
+        cursor.execute("SELECT id, username, url FROM authors WHERE username ILIKE %s OR url ILIKE %s LIMIT 50", (q, q))
+        authors = cursor.fetchall()
+        return [{"id": author[0], "username": author[1], "url": author[2]} for author in authors]
+
+@app.get("/api/author/{author_id}")
+async def author(author_id: int, offset: int = 0):
+    with database.get_db_connection() as connection:
+        cursor = connection.cursor()
+        cursor.execute("SELECT username, url FROM authors WHERE id = %s", (author_id,))
+        author = cursor.fetchone()
+        if not author:
+            return {"error": "Author not found"}
+
+        cursor.execute("SELECT COUNT(*) FROM posts WHERE author_id = %s", (author_id,))
+        total_posts = cursor.fetchone()[0]
+
+        cursor.execute("SELECT \"posts\".id AS id, content, post_url, date_part('epoch', indexed_at) AS indexed_at FROM posts WHERE author_id = %s ORDER BY posts.indexed_at DESC LIMIT 50 OFFSET %s", (author_id, offset))
+        posts = cursor.fetchall()
+
+        postIDs = []
+        for post in posts:
+            postIDs.append(post[0])
+
+        cursor.execute("SELECT post_id, description, url FROM attachments WHERE post_id = ANY(%s)", (postIDs,))
+        attachments = cursor.fetchall()
+
+        formatted_posts = []
+        for post in posts:
+            attachments_for_post = []
+            for attachment in attachments:
+                if attachment[0] == post[0]:
+                    attachments_for_post.append({
+                        "id": attachment[0],
+                        "description": attachment[1],
+                        "url": attachment[2]
+                    })
+
+            formatted_posts.append({
+                "id": post[0],
+                "content": post[1],
+                "post_url": post[2],
+                "indexed_at": int(post[3])*1000,
+                "attachments": attachments_for_post,
+                "author_id": author_id,
+                "username": author[0]
+            })
+        print(formatted_posts)
+
+        return {"id": author_id, "username": author[0], "url": author[1], "posts": formatted_posts, "total_posts": total_posts}
 
 @app.get("/api/search")
 async def search(q: str, offset: int = 0):
     with database.get_db_connection() as connection:
         cursor = connection.cursor()
 
+        # Get potential result count
+        cursor.execute("SELECT COUNT(*) FROM posts WHERE posts.content_ts @@ websearch_to_tsquery('english', %s::text)", (q,))
+        total_result_count = cursor.fetchone()[0]
+        if total_result_count == 0:
+            return {"posts": []}
+
         cursor.execute(
-            "SELECT \"posts\".id AS id, content, a.username, post_url, date_part('epoch', indexed_at) AS indexed_at FROM (SELECT * FROM posts WHERE posts.content_ts @@ websearch_to_tsquery('english', %s::text)) AS posts "
+            "SELECT \"posts\".id AS id, content, a.username, post_url, date_part('epoch', indexed_at) AS indexed_at, a.id FROM (SELECT * FROM posts WHERE posts.content_ts @@ websearch_to_tsquery('english', %s::text)) AS posts "
             "JOIN authors a on posts.author_id = a.id "
             "ORDER BY indexed_at DESC LIMIT 50 OFFSET %s",
             (q, offset, ))
-
         posts = cursor.fetchall()
 
         # Get attachments of the posts
@@ -90,10 +153,11 @@ async def search(q: str, offset: int = 0):
                 "username": post[2],
                 "post_url": post[3],
                 "indexed_at": int(post[4])*1000,
-                "attachments": attachments_for_post
+                "attachments": attachments_for_post,
+                "author_id": post[5]
             })
 
-        return {"posts": formatted_posts}
+        return {"posts": formatted_posts, "total_result_count": total_result_count}
 
 
 @app.websocket("/stream")

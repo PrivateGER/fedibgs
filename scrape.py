@@ -20,8 +20,6 @@ AUTH_HEADER = None
 if len(sys.argv) >= 3 and sys.argv[2]:
     AUTH_HEADER = "Bearer " + sys.argv[2]
 
-q = Queue(connection=database.get_redis_connection())
-
 queue_buffer = []
 buffer_size = 32
 class BGSListener(StreamListener):
