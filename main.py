@@ -161,40 +161,57 @@ async def search(q: str, offset: int = 0):
 
 
 @app.websocket("/stream")
-async def stream_posts(websocket: WebSocket, query: str = ""):
+async def stream_posts(websocket: WebSocket):
     await websocket.accept()
     last_unix = int(time.time())
     try:
         while True:
-            print("Sending posts after", last_unix)
-            # If empty query, just get the latest posts
-            if not query:
-                with database.get_db_connection() as connection:
-                    cursor = connection.cursor()
-                    cursor.execute(
-                        "SELECT content, a.username, post_url, date_part('epoch', indexed_at) AS indexed_at FROM posts JOIN public.authors a on "
-                        "posts.author_id = a.id WHERE indexed_at > to_timestamp(%s)"
-                        "ORDER BY indexed_at DESC LIMIT 50", (last_unix - 1,))
-                    posts = cursor.fetchall()
-                    cursor.close()
-                    await websocket.send_json({"posts": posts})
-            else:
-                with database.get_db_connection() as connection:
-                    cursor = connection.cursor()
-                    cursor.execute("SELECT content, a.username, post_url FROM posts JOIN public.authors a on "
-                                   "posts.author_id = a.id WHERE indexed_at > to_timestamp(%s)"
-                                   "AND posts.content_ts @@ websearch_to_tsquery('english', %s::text) ORDER BY indexed_at DESC LIMIT 50",
-                                   (last_unix - 1, query,))
-                    posts = cursor.fetchall()
-                    cursor.close()
-                    await websocket.send_json({"posts": posts})
+            with database.get_db_connection() as connection:
+                cursor = connection.cursor()
+                cursor.execute(
+                    "SELECT posts.id AS id, content, a.username, post_url, date_part('epoch', indexed_at), author_id AS indexed_at FROM posts "
+                    "JOIN authors a on posts.author_id = a.id WHERE indexed_at > to_timestamp(%s) "
+                    "ORDER BY indexed_at DESC LIMIT 50",
+                    (last_unix,))
+
+                posts = cursor.fetchall()
+                postIDs = []
+                for post in posts:
+                    postIDs.append(post[0])
+
+                cursor.execute("SELECT post_id, description, url FROM attachments WHERE post_id = ANY(%s)", (postIDs,))
+                attachments = cursor.fetchall()
+
+                formatted_posts = []
+                for post in posts:
+                    attachments_for_post = []
+                    for attachment in attachments:
+                        if attachment[0] == post[0]:
+                            attachments_for_post.append({
+                                "id": str(attachment[0]),
+                                "description": attachment[1],
+                                "url": attachment[2]
+                            })
+
+                    formatted_posts.append({
+                        "id": str(post[0]),
+                        "content": post[1],
+                        "username": post[2],
+                        "post_url": post[3],
+                        "indexed_at": int(post[4])*1000,
+                        "attachments": attachments_for_post,
+                        "author_id": str(post[5])
+                    })
+
+                await websocket.send_json({"posts": formatted_posts})
 
             last_unix = int(time.time())
             # Sleep 500ms to avoid hammering the database
             await asyncio.sleep(1)
     except Exception as e:
-        print("Error in stream_posts:", e)
         print("Stream connection closed")
+        print("Error in stream_posts:", e)
+        raise e
 
 
 class SPAStaticFiles(StaticFiles):
