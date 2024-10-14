@@ -1,10 +1,18 @@
 import hashlib
 import sys
+import threading
 import uuid
 from contextlib import closing
 
 import requests
 from mastodon import StreamListener
+from prometheus_client import Counter
+from fastapi import FastAPI
+from prometheus_client import make_asgi_app
+import uvicorn
+
+scraped_posts = Counter('scraped_posts', 'Number of posts scraped from the endpoint during runtime')
+scraped_attachments = Counter('scraped_attachments', 'Number of attachments scraped from the endpoint during runtime')
 
 import database
 import tasks
@@ -68,6 +76,7 @@ class BGSListener(StreamListener):
                 "description": attachment["description"],
                 "url": attachment_url,
             })
+            scraped_attachments.inc()
 
         tags = []
         for tag in status["tags"]:
@@ -86,6 +95,7 @@ class BGSListener(StreamListener):
         }
 
         queue_buffer.append(object)
+        scraped_posts.inc()
         print('\r- Buffered %d/%d posts - ID: %s' % (len(queue_buffer), buffer_size, object["id"]),
               end='', flush=True)
 
@@ -121,7 +131,19 @@ def stream_timeline(endpoint, listener, params={}):
     with closing(connection) as r:
         listener.handle_stream(r)
 
+app = FastAPI(debug=False)
+metrics_app = make_asgi_app()
+app.mount("/metrics", metrics_app)
 
-listener = BGSListener()
+def start_metrics_server():
+    uvicorn.run(app, host="0.0.0.0", port=9999, log_level="error")
 
-stream_timeline(FEDERATED_TIMELINE_STREAM, listener)
+
+if __name__ == "__main__":
+    # Start the metrics server in a separate thread
+    metrics_thread = threading.Thread(target=start_metrics_server, daemon=True)
+    metrics_thread.start()
+
+    # Start the main application
+    listener = BGSListener()
+    stream_timeline(FEDERATED_TIMELINE_STREAM, listener)
