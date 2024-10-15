@@ -32,7 +32,8 @@ FEDERATED_TIMELINE_STREAM = STREAM_BASE + "/api/v1/streaming/public"
 
 AUTH_HEADER = None
 if len(sys.argv) >= 3 and sys.argv[2]:
-    AUTH_HEADER = "Bearer " + sys.argv[2]
+    logging.info("Using provided auth header")
+    AUTH_HEADER = "Bearer " + sys.argv[2].strip()
 
 queue_buffer = []
 buffer_size = 32
@@ -123,15 +124,20 @@ class BGSListener(StreamListener):
 
 def stream_timeline(endpoint, listener, params={}):
     def connect_func():
-        headers = {"User-Agent": "FediBGS/0.0.1"}
+        headers = {"User-Agent": "FediBGS/0.0.1", "Accept": "text/event-stream"}
         if AUTH_HEADER:
             headers["Authorization"] = AUTH_HEADER
 
+            # Only show first and last bits of the token
+            redacted_token = AUTH_HEADER[:10] + "..." + AUTH_HEADER[-10:]
+            logging.info("Connecting to %s with token %s" % (endpoint, redacted_token))
+
         connection = requests.get(endpoint, headers=headers, data=params, stream=True,
-                                  timeout=None)
+                                  timeout=None, allow_redirects=True)
 
         if connection.status_code != 200:
             logging.error("Could not connect to server. HTTP status: %i" % connection.status_code)
+            logging.error(connection.text)
             return None
         return connection
 
