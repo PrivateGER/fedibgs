@@ -151,7 +151,9 @@ metrics_app = make_asgi_app()
 app.mount("/metrics", metrics_app)
 
 def start_metrics_server():
-    uvicorn.run(app, host="0.0.0.0", port=9999, log_level="error")
+    # Get METRICS_PORT from environment, default to 9999
+    port = os.getenv("METRICS_PORT", 9999)
+    uvicorn.run(app, host="0.0.0.0", port=port, log_level="error")
 
 # Kill program if no posts are scraped for 30 seconds
 def post_watchdog():
