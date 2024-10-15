@@ -1,6 +1,9 @@
 import hashlib
+import os
+import signal
 import sys
 import threading
+import time
 import uuid
 from contextlib import closing
 
@@ -10,6 +13,9 @@ from prometheus_client import Counter
 from fastapi import FastAPI
 from prometheus_client import make_asgi_app
 import uvicorn
+import logging
+
+logging.basicConfig(level=logging.INFO, datefmt='%Y-%m-%d %H:%M:%S')
 
 scraped_posts = Counter('scraped_posts', 'Number of posts scraped from the endpoint during runtime')
 scraped_attachments = Counter('scraped_attachments', 'Number of attachments scraped from the endpoint during runtime')
@@ -62,14 +68,13 @@ class BGSListener(StreamListener):
 
                 # check that it returns a file (200 OK)
                 if attachment_response.status_code != 200:
-                    print("Attachment URL returned non-200 status code:",
-                          attachment_response.status_code, attachment_url)
+                    logging.warning("Attachment URL returned non-200 status code: %s - %s" % (attachment_response.status_code, attachment_url))
                     continue
 
                 if attachment_response.url != attachment_url:
                     attachment_url = attachment_response.url
             except Exception as e:
-                print("Error while checking attachment URL:", e)
+                logging.error("Error while checking attachment URL: %s" % e)
                 continue
 
             attachments.append({
@@ -96,20 +101,24 @@ class BGSListener(StreamListener):
 
         queue_buffer.append(object)
         scraped_posts.inc()
-        print('\r- Buffered %d/%d posts - ID: %s' % (len(queue_buffer), buffer_size, object["id"]),
-              end='', flush=True)
+        #print('\r- Buffered %d/%d posts - ID: %s' % (len(queue_buffer), buffer_size, object["id"]), end='', flush=True)
 
         if len(queue_buffer) >= buffer_size:
             tasks.ingest_batch.delay(queue_buffer)
 
             queue_buffer.clear()
-            print("\r- OK - Buffer flushed -", end='', flush=True)
+            #print("\r- OK - Buffer flushed -", end='', flush=True)
+            logging.info("Buffer flushed - %d posts" % buffer_size)
 
         return True
 
     def on_abort(self, status):
-        print(status)
-        return True
+        logging.error("Stream connection aborted: %s" % status)
+        os.kill(os.getpid(), signal.SIGINT)
+
+    def on_error(self, status_code):
+        logging.error("Stream connection error: %s" % status_code)
+        os.kill(os.getpid(), signal.SIGINT)
 
 
 def stream_timeline(endpoint, listener, params={}):
@@ -122,7 +131,7 @@ def stream_timeline(endpoint, listener, params={}):
                                   timeout=None)
 
         if connection.status_code != 200:
-            print("Could not connect to server. HTTP status: %i" % connection.status_code)
+            logging.error("Could not connect to server. HTTP status: %i" % connection.status_code)
             return None
         return connection
 
@@ -138,11 +147,31 @@ app.mount("/metrics", metrics_app)
 def start_metrics_server():
     uvicorn.run(app, host="0.0.0.0", port=9999, log_level="error")
 
+# Kill program if no posts are scraped for 30 seconds
+def post_watchdog():
+    logging.info("Starting watchdog...")
+    watchdog_counter = 0
+    while True:
+        if watchdog_counter >= 30:
+            logging.error("No posts scraped for 30 seconds, exiting...")
+            os.kill(os.getpid(), signal.SIGINT)
+        if len(queue_buffer) > 0:
+            watchdog_counter = 0
+        else:
+            watchdog_counter += 1
+            if watchdog_counter % 5 == 0:
+                logging.warning("No posts scraped for %d seconds" % watchdog_counter)
+        time.sleep(1)
+
 
 if __name__ == "__main__":
     # Start the metrics server in a separate thread
     metrics_thread = threading.Thread(target=start_metrics_server, daemon=True)
     metrics_thread.start()
+
+    # Start the watchdog in a separate thread
+    watchdog_thread = threading.Thread(target=post_watchdog, daemon=True)
+    watchdog_thread.start()
 
     # Start the main application
     listener = BGSListener()

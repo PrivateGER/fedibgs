@@ -224,6 +224,4 @@ class SPAStaticFiles(StaticFiles):
             else:
                 raise ex
 
-
-
 app.mount('/', SPAStaticFiles(directory='fedibgs-fe/dist/', html=True))
