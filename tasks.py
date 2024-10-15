@@ -87,6 +87,7 @@ def ingest_batch(datasets):
             exists = cursor.fetchone()[0]
             connection.commit()
             if exists:
+                print(f"Post {dataset['id']} already exists")
                 continue
 
             if dataset["author"]["url"] not in author_id_map:
