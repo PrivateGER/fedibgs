@@ -160,12 +160,14 @@ def start_metrics_server():
 def post_watchdog():
     logging.info("Starting watchdog...")
     watchdog_counter = 0
+    old_post_size = 0
     while True:
         if watchdog_counter >= 30:
             logging.error("No posts scraped for 30 seconds, exiting...")
             os.kill(os.getpid(), signal.SIGINT)
-        if len(queue_buffer) > 0:
+        if len(queue_buffer) != old_post_size:
             watchdog_counter = 0
+            old_post_size = len(queue_buffer)
         else:
             watchdog_counter += 1
             if watchdog_counter % 5 == 0:
