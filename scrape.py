@@ -5,6 +5,7 @@ import sys
 import threading
 import time
 import uuid
+from asyncio import timeout
 from contextlib import closing
 
 import requests
@@ -65,7 +66,7 @@ class BGSListener(StreamListener):
 
             # HEAD request to check whether a redirect is present
             try:
-                attachment_response = requests.head(attachment_url, allow_redirects=True)
+                attachment_response = requests.head(attachment_url, allow_redirects=True, timeout=2, headers={"User-Agent": "FediBGS/0.0.1"})
 
                 # check that it returns a file (200 OK)
                 if attachment_response.status_code != 200:
