@@ -7,6 +7,7 @@ import time
 import uuid
 from asyncio import timeout
 from contextlib import closing
+from datetime import datetime
 
 import requests
 from mastodon import StreamListener
@@ -101,7 +102,8 @@ class BGSListener(StreamListener):
             "author": {
                 "url": status["account"]["url"],
                 "username": status["account"]["username"],
-            }
+            },
+            "indexedAt": datetime.now(),
         }
 
         queue_buffer.append(object)

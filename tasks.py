@@ -120,10 +120,10 @@ def ingest_batch(datasets):
 
             try:
                 # Insert the post
-                cursor.execute("INSERT INTO posts (id, content, post_url, tags, author_id) "
-                               "VALUES (%s, %s, %s, %s, %s)", (dataset["id"], strip_tags(dataset["content"]),
+                cursor.execute("INSERT INTO posts (id, content, post_url, tags, author_id, indexed_at) "
+                               "VALUES (%s, %s, %s, %s, %s, %s)", (dataset["id"], strip_tags(dataset["content"]),
                                                                dataset["postURL"],
-                                                               json.dumps(dataset["tags"]), author_id))
+                                                               json.dumps(dataset["tags"]), author_id, dataset["indexedAt"] or time.time()))
                 logger.info(f"Inserted post {dataset['id']}")
 
                 for attachment in dataset["attachments"]:
