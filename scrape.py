@@ -10,7 +10,7 @@ from contextlib import closing
 
 import requests
 from mastodon import StreamListener
-from prometheus_client import Counter
+from prometheus_client import Counter, Histogram
 from fastapi import FastAPI
 from prometheus_client import make_asgi_app
 import uvicorn
@@ -20,6 +20,9 @@ logging.basicConfig(level=logging.INFO, datefmt='%Y-%m-%d %H:%M:%S')
 
 scraped_posts = Counter('scraped_posts', 'Number of posts scraped from the endpoint during runtime')
 scraped_attachments = Counter('scraped_attachments', 'Number of attachments scraped from the endpoint during runtime')
+scraped_posts_heatmap = Histogram('post_time_by_hour', 'Post time by hour', buckets=(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
+                                                                                   11, 12, 13, 14, 15, 16, 17, 18, 19,
+                                                                                   20, 21, 22, 23))
 
 import database
 import tasks
@@ -103,6 +106,7 @@ class BGSListener(StreamListener):
 
         queue_buffer.append(object)
         scraped_posts.inc()
+        scraped_posts_heatmap.observe(time.localtime().tm_hour)
         #print('\r- Buffered %d/%d posts - ID: %s' % (len(queue_buffer), buffer_size, object["id"]), end='', flush=True)
 
         if len(queue_buffer) >= buffer_size:
