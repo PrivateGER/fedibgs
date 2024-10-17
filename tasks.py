@@ -53,8 +53,8 @@ def preprocess_dataset(dataset):
             for attachment in dataset["attachments"]
             if attachment["url"] and attachment["url"].startswith("http")
                and attachment["url"].endswith((".jpg", ".jpeg", ".png", ".gif", ".webp"))
+            ]
         ]
-                        ]
     }
     return preprocessed
 
@@ -123,7 +123,7 @@ def ingest_batch(datasets):
                 cursor.execute("INSERT INTO posts (id, content, post_url, tags, author_id, indexed_at) "
                                "VALUES (%s, %s, %s, %s, %s, %s)", (dataset["id"], strip_tags(dataset["content"]),
                                                                dataset["postURL"],
-                                                               json.dumps(dataset["tags"]), author_id, dataset["indexedAt"] or time.time()))
+                                                               json.dumps(dataset["tags"]), author_id, dataset.get("indexedAt", time.time())))
                 logger.info(f"Inserted post {dataset['id']}")
 
                 for attachment in dataset["attachments"]:
