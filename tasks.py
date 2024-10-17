@@ -1,6 +1,7 @@
 import json
 import time
 import uuid
+from datetime import datetime
 
 from io import StringIO
 from html.parser import HTMLParser
@@ -123,7 +124,7 @@ def ingest_batch(datasets):
                 cursor.execute("INSERT INTO posts (id, content, post_url, tags, author_id, indexed_at) "
                                "VALUES (%s, %s, %s, %s, %s, %s)", (dataset["id"], strip_tags(dataset["content"]),
                                                                dataset["postURL"],
-                                                               json.dumps(dataset["tags"]), author_id, dataset.get("indexedAt", time.time())))
+                                                               json.dumps(dataset["tags"]), author_id, dataset.get("indexedAt", datetime.now())))
                 logger.info(f"Inserted post {dataset['id']}")
 
                 for attachment in dataset["attachments"]:
