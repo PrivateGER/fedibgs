@@ -16,7 +16,7 @@ from prometheus_client import make_asgi_app
 import uvicorn
 import logging
 
-logging.basicConfig(level=logging.INFO, datefmt='%Y-%m-%d %H:%M:%S')
+logging.basicConfig(datefmt='%Y-%m-%d %H:%M:%S')
 
 scraped_posts = Counter('scraped_posts', 'Number of posts scraped from the endpoint during runtime')
 scraped_attachments = Counter('scraped_attachments', 'Number of attachments scraped from the endpoint during runtime')
